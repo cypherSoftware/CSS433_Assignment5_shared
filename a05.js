@@ -78,6 +78,9 @@ function readScene()//This is the function that is called after user selects mul
 						var file_data = this.result;
 						scene=parseScene(file_data);//Parse scene
 						filesToRead[index]=false;
+							//Verify adding Mirror parsing code worked
+							console.log("Onlybillboard:", scene.billboard);
+							console.log("Onlymirror:", scene.mirror);
 					}else if(fileExtension=='json')
 					{
 						var file_data = this.result;
@@ -137,6 +140,7 @@ function readScene()//This is the function that is called after user selects mul
 			}
 			
 		}
+		
 		drawScene();//Enter the drawing loop();
 	}
 }
@@ -950,9 +954,10 @@ class Camera{
 }
 
 class Scene{//This object technically stores everything required for a scene
-	constructor(light,billboard,obj,camera){
+	constructor(light,billboard,mirror, obj,camera){
 		this.light=light;
 		this.billboard=billboard;
+		this.mirror = mirror;
 		this.camera=camera;
 		this.obj=obj;
 	}
@@ -980,6 +985,30 @@ function parseScene(file_data)//A simple function to read JSON and put the data 
 		
 		billboard=new Billboard(upperLeft,lowerLeft,upperRight,lowerRight,sceneFile.billboard.filename,null,null);//Image is assigned to billboard later
 	}
+
+		var mirror = null;
+	if ('mirror' in sceneFile) { // If mirror exists in scene
+		let upperLeft = new Vector3(sceneFile.mirror.UpperLeft[0],sceneFile.mirror.UpperLeft[1],sceneFile.mirror.UpperLeft[2]);
+		let lowerLeft = new Vector3(sceneFile.mirror.LowerLeft[0],sceneFile.mirror.LowerLeft[1],sceneFile.mirror.LowerLeft[2]);
+		let upperRight = new Vector3(sceneFile.mirror.UpperRight[0],sceneFile.mirror.UpperRight[1],sceneFile.mirror.UpperRight[2]);
+
+		// Compute lower-right from the other 3 corners
+		let mirrorHeight = upperLeft.y - lowerLeft.y;
+		let lowerRight = new Vector3(upperRight.x,upperRight.y - mirrorHeight,upperRight.z);
+
+		// Mirror uses Billboard class too.
+		// No image file is needed yet because later this will use a render-to-texture result.
+		mirror = new Billboard(
+			upperLeft,
+			lowerLeft,
+			upperRight,
+			lowerRight,
+			null,
+			null,
+			null
+		);
+	}
+
 	var obj=null;
 	if ('obj' in sceneFile) {//If billboard exists in scene
 		let position=sceneFile.obj.position;
