@@ -399,6 +399,11 @@ function programAll(){
 function preprocessBuffers(){
 	makeObjBuffers();
 	makeBillboardBuffers();
+	makeMirrorBuffers();
+	//Check making the buffers works
+	console.log("mirror object:", currentScene.mirror);
+	console.log("mirror framebuffer:", currentScene.mirror.framebuffer);
+	console.log("mirror render texture:", currentScene.mirror.renderTexture);
 }
 
 function makeBillboardBuffers(){
@@ -432,6 +437,82 @@ function makeBillboardBuffers(){
     gl.generateMipmap(gl.TEXTURE_2D);
   
     sceneBillboard.setBuffers(billboardPositionBuffer,billboardTextcoordBuffer,billboardNormalBuffer,billboardTextureBuffer);
+}
+
+function makeMirrorBuffers(){
+	let sceneMirror = currentScene.mirror;
+
+	//Skip if no mirror exists in scene
+	if(!sceneMirror){
+		return; // no mirror in this scene
+	}
+
+	// Create a buffer for positions
+	let mirrorPositionBuffer = gl.createBuffer();
+	// Bind it to ARRAY_BUFFER (think of it as ARRAY_BUFFER = positionBuffer)
+	gl.bindBuffer(gl.ARRAY_BUFFER, mirrorPositionBuffer);
+	 // Set Texcoords.
+	setBillboardGeometry(gl, sceneMirror);
+
+	 // provide texture coordinates for the rectangle.
+	let mirrorTextcoordBuffer = gl.createBuffer();
+	gl.bindBuffer(gl.ARRAY_BUFFER, mirrorTextcoordBuffer);
+	setBillboardTexcoords(gl, sceneMirror);
+
+    // Create a buffer to put normals in
+	let mirrorNormalBuffer = gl.createBuffer();
+	// Bind it to ARRAY_BUFFER (think of it as ARRAY_BUFFER = normalBuffer)
+	gl.bindBuffer(gl.ARRAY_BUFFER, mirrorNormalBuffer);
+	// Put normals data into buffer
+	setBillboardNormals(gl, sceneMirror);
+
+
+	// Pick a fixed texture size for now.
+	// 512x512 is a good starting point.
+	let targetTextureWidth = 512;
+	let targetTextureHeight = 512;
+
+	//Create a texture
+	let mirrorRenderTexture = gl.createTexture();
+	gl.bindTexture(gl.TEXTURE_2D, mirrorRenderTexture);
+	gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,targetTextureWidth,targetTextureHeight,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
+
+	// For render-to-texture, clamp + linear is a safe starter setup
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+	//Depth buffer for offscreen rendering
+	let mirrorDepthBuffer = gl.createRenderbuffer();
+	gl.bindRenderbuffer(gl.RENDERBUFFER, mirrorDepthBuffer);
+	gl.renderbufferStorage(gl.RENDERBUFFER,gl.DEPTH_COMPONENT16,targetTextureWidth,targetTextureHeight);
+
+	//Freame Buffer
+	let mirrorFramebuffer = gl.createFramebuffer();
+	gl.bindFramebuffer(gl.FRAMEBUFFER, mirrorFramebuffer);
+
+	// Attach color texture
+	gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,mirrorRenderTexture,0);
+
+	// Attach depth renderbuffer
+	gl.framebufferRenderbuffer(gl.FRAMEBUFFER,gl.DEPTH_ATTACHMENT,gl.RENDERBUFFER,mirrorDepthBuffer);
+
+	// Optional but very useful check (Googlesays this is a good idea)
+	let fbStatus = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+	if (fbStatus !== gl.FRAMEBUFFER_COMPLETE) {
+		console.error("Mirror framebuffer is incomplete. Status:", fbStatus);
+	}
+
+	// Clean up bindings so later code starts from a normal state
+	gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+	gl.bindTexture(gl.TEXTURE_2D, null);
+	gl.bindRenderbuffer(gl.RENDERBUFFER, null);
+
+	//Store everything on mirror
+	sceneMirror.setBuffers(mirrorPositionBuffer,mirrorTextcoordBuffer,mirrorNormalBuffer,mirrorRenderTexture);
+
+	sceneMirror.setRenderTarget(mirrorFramebuffer,mirrorRenderTexture,mirrorDepthBuffer,targetTextureWidth,targetTextureHeight);
 }
 
 function makeObjBuffers(){
@@ -909,6 +990,14 @@ class Billboard{
 		this.normalBuffer=normalBuffer;
 		this.billboardTextureBuffer=billboardTextureBuffer;
 	}
+
+	setRenderTarget(framebuffer, renderTexture, depthBuffer, width, height){
+		this.framebuffer = framebuffer;
+		this.renderTexture = renderTexture;
+		this.depthBuffer = depthBuffer;
+		this.renderTargetWidth = width;
+		this.renderTargetHeight = height;
+	}
 }
 
 class Object3D{
@@ -1015,5 +1104,5 @@ function parseScene(file_data)//A simple function to read JSON and put the data 
 		let fileName=sceneFile.obj.filename;
 		obj=new Object3D(position,fileName);
 	}
-	return new Scene(light,billboard,obj,camera);
+	return new Scene(light,billboard,mirror, obj,camera);
 }
