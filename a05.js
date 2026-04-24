@@ -38,11 +38,81 @@ var objProgram;
 var mirrorProgram;
 var phongExp=5;
 
+var camX = document.getElementById("camXID");
+var camY = document.getElementById("camYID");
+var camZ = document.getElementById("camZID");
+
 var objX = document.getElementById('objXID');//Slider for obj position
 var objY = document.getElementById('objYID');//Slider for obj position
 var objZ = document.getElementById('objZID');//Slider for obj position
+
 var pexp = document.getElementById('pexpID');//Slider for phong
 var isShowDepth = document.getElementById('isDepthBuffer');//checkbox for depth
+
+camX.addEventListener("input", function(evt) {
+	if(doneLoading && currentScene){
+		currentScene.camera.position.x=Number(camX.value);
+		var camXLabel = document.getElementById("camXLabelID");
+		camXLabel.innerHTML = camX.value;
+		camX.label = "Cam X: "+camX.value;//refresh camX text
+	}
+},false);
+
+camY.addEventListener("input", function(evt) {
+	if(doneLoading && currentScene){
+		currentScene.camera.position.y=Number(camY.value);
+		var camYLabel = document.getElementById("camYLabelID");
+		camYLabel.innerHTML = camY.value;
+		camY.label = "Cam Y: "+camY.value;//refresh camY text
+	}
+},false);
+
+camZ.addEventListener("input", function(evt) {
+	if(doneLoading && currentScene){
+		currentScene.camera.position.z=Number(camZ.value);
+		var camZLabel = document.getElementById("camZLabelID");
+		camZLabel.innerHTML = camZ.value;
+		camZ.label = "Cam Z: "+camZ.value;//refresh camZ text
+	}
+},false);
+
+objX.addEventListener("input", function(evt) {
+	if(doneLoading && currentScene && currentScene.obj){
+		currentScene.obj.position[0] = Number(camX.value);
+		var objXLabel = document.getElementById("objXLabelID");
+		objXLabel.innerHTML = objX.value;
+		objX.label = "Obj X: "+objX.value;//refresh objX text
+	}
+},false);
+
+objY.addEventListener("input", function(evt) {
+	if(doneLoading && currentScene && currentScene.obj){
+		currentScene.obj.position[1] = Number(objY.value);
+		var objYLabel = document.getElementById("objYLabelID");
+		objYLabel.innerHTML = objY.value;
+		objY.label = "Obj Y: "+objY.value;//refresh objY text
+	}
+},false);
+
+objZ.addEventListener("input", function(evt) {
+	if(doneLoading && currentScene && currentScene.obj){
+		currentScene.obj.position[2] = Number(objZ.value);
+		var objZLabel = document.getElementById("objZLabelID");
+		objZLabel.innerHTML = objZ.value;
+		objZ.label = "Obj Y: "+objZ.value;//refresh objZ text
+	}
+},false);
+
+pexp.addEventListener("input", function(evt){
+	if(doneLoading==true){
+		phongExp=Number(pexp.value);
+		var phongLabel = document.getElementById("pexpLabelID");
+		phongLabel.innerHTML = pexp.value;
+		pexp.label = "Phong exponent: "+pexp.value;
+	}
+},false);
+
+
 
 function readScene()//This is the function that is called after user selects multiple files of images and scenes
 {
@@ -234,7 +304,8 @@ function renderReflectionPass(){
 	// Aposey Note: TEMPORARY:
 	// For now, use the real camera.
 	// Later this will be replaced with the reflected fake camera.
-	var reflectionCamera = currentScene.camera;
+	//Romero Note: Added function call to compute "fake" camera (called refleciton camera)
+	var reflectionCamera = computeReflectionCamera(currentScene.camera, currentScene.mirror);
 
 	// Render the scene into the mirror texture.
 	// Important: do NOT render the mirror here,
@@ -245,6 +316,47 @@ function renderReflectionPass(){
 	// Return to the normal/default framebuffer.
 	// This means future rendering goes to the screen again.
 	gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+}
+/*
+	Name: computeReflectionCamera()
+	Purpose: take a "real" camera and mirror billboard position and compute the plane and points 
+	to map the reflection texture to.
+	Arguments: camera - the scene Camera
+			   mirror - the billboard that represents the Mirror
+	Return: a new instance of camera class that represent the "fake" camera
+*/
+function computeReflectionCamera(camera, mirror){
+	let eye = camera.position;
+	let target = camera.target;
+	let up = camera.up;
+	
+	//build normal
+	let v = Vector3.minusTwoVectors(mirror.UpperLeft, mirror.LowerLeft);
+	let u = Vector3.minusTwoVectors(mirror.LowerRight, mirror.LowerLeft);
+	let normal = Vector3.normalizeVector(Vector3.crossProduct(u,v));
+	
+	//plane = n * P + d = 0
+	let d = -Vector3.dotProduct(normal, mirror.LowerLeft);
+	
+	//compute reflection points -- used to translate new eye and target
+	function reflectPoint(p){
+		let dist = Vector3.dotProduct(normal, p) + d;
+		let scaled = Vector3.multiplyVectorScalar(normal, 2 * dist);
+		return Vector3.minusTwoVectors(p, scaled);
+	}
+	
+	let newEye = reflectPoint(eye)
+	let newTarget = reflectPoint(target)
+	
+	return new Camera(
+		newEye,
+		newTarget,
+		up,
+		camera.fov,
+		camera.far,
+		camera.near,
+		camera.DefaulColor
+	)
 }
 
 function renderMainPass(){
@@ -392,8 +504,8 @@ function renderBillboardWithCamera(camera){
 	gl.uniform1i(billboardProgram.textureUniformLocation, 0);
 
 	// Other uniforms
-	var phongExponent = document.getElementById("phongExponent").value;
-
+	var phongExponent = document.getElementById("pexpID").value;
+	/*
 	gl.uniform1f(
 		billboardProgram.phongExponentLocationUniform,
 		phongExponent
@@ -406,7 +518,7 @@ function renderBillboardWithCamera(camera){
 	}else{
 		gl.uniform1i(billboardProgram.isDepthBuffer, 0);
 	}
-
+	*/
 	// Draw the billboard: 2 triangles, 6 vertices total
 	gl.drawArrays(gl.TRIANGLES, 0, 6);
 }
@@ -539,21 +651,21 @@ function renderMirror(){
 	gl.bindTexture(gl.TEXTURE_2D, currentScene.mirror.renderTexture);
 	gl.uniform1i(billboardProgram.textureUniformLocation, 0);
 
-	var phongExponent = document.getElementById("phongExponent").value;
-
+	var phongExponent = document.getElementById("pexpID").value;
+	/*
 	gl.uniform1f(
 		billboardProgram.phongExponentLocationUniform,
 		phongExponent
 	);
-
-	var showDepthBuffer = document.getElementById("depthBuffer").checked;
-
+	*/
+	var showDepthBuffer = document.getElementById("isDepthBuffer").checked;
+	/*
 	if(showDepthBuffer){
 		gl.uniform1i(billboardProgram.isDepthBuffer, 1);
 	}else{
 		gl.uniform1i(billboardProgram.isDepthBuffer, 0);
 	}
-
+	*/
 	// Draw the mirror: 2 triangles, 6 vertices total
 	gl.drawArrays(gl.TRIANGLES, 0, 6);
 }
@@ -676,22 +788,22 @@ function renderObjWithCamera(camera){
 	);
 
 	// Other uniforms
-	var phongExponent = document.getElementById("phongExponent").value;
-
+	var phongExponent = document.getElementById("pexpID").value;
+	/*
 	gl.uniform1f(
 		objProgram.phongExponentLocationUniform,
 		phongExponent
 	);
-
-	var showDepthBuffer = document.getElementById("depthBuffer").checked;
-
+	*/
+	var showDepthBuffer = document.getElementById("isDepthBuffer").checked;
+	/*
 	if(showDepthBuffer){
 		gl.uniform1i(objProgram.isDepthBuffer, 1);
 	}
 	else{
 		gl.uniform1i(objProgram.isDepthBuffer, 0);
 	}
-
+	*/
 	gl.drawArrays(gl.TRIANGLES, 0, currentScene.obj.numVertices);
 }
 
@@ -757,12 +869,15 @@ function makeMirrorBuffers(){
 	gl.bindBuffer(gl.ARRAY_BUFFER, mirrorPositionBuffer);
 	 // Set Texcoords.
 	setBillboardGeometry(gl, sceneMirror);
-
+	
 	 // provide texture coordinates for the rectangle.
 	let mirrorTextcoordBuffer = gl.createBuffer();
 	gl.bindBuffer(gl.ARRAY_BUFFER, mirrorTextcoordBuffer);
-	setBillboardTexcoords(gl, sceneMirror);
-
+	//setBillboardTexcoords(gl, sceneMirror);
+	
+	let fakeCam = computeReflectionCamera(currentScene.camera, sceneMirror);
+	setMirrorTextcoords(gl, sceneMirror, fakeCam);
+	
     // Create a buffer to put normals in
 	let mirrorNormalBuffer = gl.createBuffer();
 	// Bind it to ARRAY_BUFFER (think of it as ARRAY_BUFFER = normalBuffer)
@@ -1061,6 +1176,64 @@ function setBillboardGeometry(gl,billboard) {
     billboard.LowerRight.x,  billboard.LowerRight.y, billboard.LowerRight.z
 	]);
 	gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
+}
+
+function setMirrorTextcoords(gl, mirror, fakeCamera){
+	/*
+	two trangles
+	UL-------UR
+	|
+	|
+	|
+	LL
+			  UR
+			  |
+			  |	
+			  |
+	LL--------LR
+	*/
+	let positions = [
+		mirror.UpperLeft,
+		mirror.LowerLeft,
+		mirror.UpperRight,
+		mirror.UpperRight,
+		mirror.LowerLeft,
+		mirror.LowerRight,
+	]
+	
+	let aspect = 1.0;
+	let projection = m4.perspective(
+		degToRad(fakeCamera.fov),
+		aspect,
+		fakeCamera.near,
+		fakeCamera.far
+	)
+	
+	let camPos = [fakeCamera.position.x, fakeCamera.position.y, fakeCamera.position.z];
+	let target = [fakeCamera.target.x, fakeCamera.target.y, fakeCamera.target.z]
+	let up = [fakeCamera.up.x, fakeCamera.up.y, fakeCamera.up.z];
+	
+	let cameraMatrix = m4.lookAt(camPos,target,up);
+	let view = m4.inverse(cameraMatrix);
+	let vp = m4.multiply(projection,view);
+	
+	let textcoords = [];
+	
+	for (let i = 0; i < positions.length; i++){
+		let p = positions[i];
+		let v = [p.x, p.y, p.z, 1]
+		
+		let clip = m4.transformVector(vp, v);
+		
+		let coordX = clip[0]/clip[3];
+		let coordY = clip[1]/clip[3];
+		
+		let u = (coordX + 1) / 2;
+		let vText = (coordY + 1) / 2;
+		
+		textcoords.push(u, vText);
+	}
+	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(textcoords),gl.STATIC_DRAW);
 }
 
 function setBillboardTexcoords(gl,billboard) {
