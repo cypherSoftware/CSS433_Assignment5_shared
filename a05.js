@@ -78,6 +78,9 @@ function readScene()//This is the function that is called after user selects mul
 						var file_data = this.result;
 						scene=parseScene(file_data);//Parse scene
 						filesToRead[index]=false;
+							//Verify adding Mirror parsing code worked
+							console.log("Onlybillboard:", scene.billboard);
+							console.log("Onlymirror:", scene.mirror);
 					}else if(fileExtension=='json')
 					{
 						var file_data = this.result;
@@ -137,6 +140,7 @@ function readScene()//This is the function that is called after user selects mul
 			}
 			
 		}
+		
 		drawScene();//Enter the drawing loop();
 	}
 }
@@ -180,210 +184,514 @@ function drawScene() {
 	setTimeout(function() { requestAnimationFrame(drawScene)}, 500);
 }
 
-function renderingFcn(){
-	gl.clearColor(currentScene.camera.DefaulColor[0], currentScene.camera.DefaulColor[1], currentScene.camera.DefaulColor[2], 1.0);
-	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-	gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-	webglUtils.resizeCanvasToDisplaySize(gl.canvas);
-	renderObj();
-	renderBillboard();
+// function renderingFcn(){
+// 	gl.clearColor(currentScene.camera.DefaulColor[0], currentScene.camera.DefaulColor[1], currentScene.camera.DefaulColor[2], 1.0);
+// 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+// 	gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+// 	webglUtils.resizeCanvasToDisplaySize(gl.canvas);
+// 	renderObj();
+// 	renderBillboard();
 
+// }
+
+//Acposey Note: Break up rendering function into two passes one to get reflection with seperate camera then second is real pass with grabbed texture
+function renderingFcn(){
+	renderReflectionPass();
+	renderMainPass();
 }
 
-function renderBillboard(){
-	gl.disable(gl.CULL_FACE);
-	
-	// Tell it to use our program (pair of shaders)
-    gl.useProgram(billboardProgram.program);
-	
-	//Todo: Here you can activate and bind any attribute you need in shader.
-    // Turn on the position attribute
-    gl.enableVertexAttribArray(billboardProgram.positionLocationAttrib);
-
-    // Bind the position buffer.
-    gl.bindBuffer(gl.ARRAY_BUFFER, currentScene.billboard.positionBuffer);
-	
-	// Tell the position attribute how to get data out of positionBuffer (ARRAY_BUFFER)
-    var size = 3;          // 3 components per iteration
-    var type = gl.FLOAT;   // the data is 32bit floats
-    var normalize = false; // don't normalize the data
-    var stride = 0;        // 0 = move forward size * sizeof(type) each iteration to get the next position
-    var offset = 0;        // start at the beginning of the buffer
-    gl.vertexAttribPointer(
-        billboardProgram.positionLocationAttrib, size, type, normalize, stride, offset);
-		
-	
-	// Turn on the normal attribute
-    gl.enableVertexAttribArray(billboardProgram.normalLocationAttrib);
-
-    // Bind the normal buffer.
-    gl.bindBuffer(gl.ARRAY_BUFFER, currentScene.billboard.normalBuffer);
-	
-	// Tell the normal attribute how to get data out of normalBuffer (ARRAY_BUFFER)
-    var size = 3;          // 3 components per iteration
-    var type = gl.FLOAT;   // the data is 32bit floats
-    var normalize = false; // don't normalize the data
-    var stride = 0;        // 0 = move forward size * sizeof(type) each iteration to get the next normal
-    var offset = 0;        // start at the beginning of the buffer
-    gl.vertexAttribPointer(
-        billboardProgram.normalLocationAttrib, size, type, normalize, stride, offset);
-		
-	
-	// Turn on the normal attribute
-    gl.enableVertexAttribArray(billboardProgram.textureLocationAttrib);
-
-    // Bind the normal buffer.
-    gl.bindBuffer(gl.ARRAY_BUFFER, currentScene.billboard.textureBuffer);
-	
-	// Tell the normal attribute how to get data out of normalBuffer (ARRAY_BUFFER)
-    var size = 2;          // 3 components per iteration
-    var type = gl.FLOAT;   // the data is 32bit floats
-    var normalize = false; // don't normalize the data
-    var stride = 0;        // 0 = move forward size * sizeof(type) each iteration to get the next normal
-    var offset = 0;        // start at the beginning of the buffer
-    gl.vertexAttribPointer(
-        billboardProgram.textureLocationAttrib, size, type, normalize, stride, offset);
-	
-
-    // Compute the projection matrix
-    var aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
-    var projectionMatrix =
-        m4.perspective(degToRad(currentScene.camera.fov), aspect, currentScene.camera.near, currentScene.camera.far);
-
-	var cameraMatrix;
-	// Compute the camera's matrix using look at.
-	cameraMatrix = m4.lookAt([currentScene.camera.position.x,currentScene.camera.position.y,currentScene.camera.position.z], [currentScene.camera.target.x,currentScene.camera.target.y,currentScene.camera.target.z], [currentScene.camera.up.x,currentScene.camera.up.y,currentScene.camera.up.z]);
-
-    // Make a view matrix from the camera matrix.
-    var viewMatrix = m4.inverse(cameraMatrix);
-
-    var viewProjectionMatrix = m4.multiply(projectionMatrix, viewMatrix);
-	
-	//Todo: You may need to input light direction as uniform to the shader program. Also here you can input any other uniform variable to shader.
-    // Set the viewProjectionMatrix.
-	gl.uniformMatrix4fv(billboardProgram.worldViewProjectionUniformLocation, false, viewProjectionMatrix);
-	
-	// Tell the shader to use texture unit 0 for u_texture
-    gl.uniform1i(billboardProgram.textureUniformLocation, 0);
-	
-	// Send the light direction to the uniform.
-	gl.uniform3fv(billboardProgram.lightDirectionUniformLocation, new Float32Array([currentScene.light.locationPoint.x,currentScene.light.locationPoint.y,currentScene.light.locationPoint.z]));
-	
-	if(isShowDepth.checked == true){// Get checkbox value
-		// get the uniform
-		isDBUniformLocation = gl.getUniformLocation(billboardProgram.program, "u_isDepthBuffer");
-		// Send data to float uniform
-		gl.uniform1f(isDBUniformLocation, 1);
-		
-		// We send near and far of the camera to the shader to normalize the depth buffer
-		// get the uniform
-		isDBUniformLocation = gl.getUniformLocation(billboardProgram.program, "u_near");
-		// Send data to float uniform
-		gl.uniform1f(isDBUniformLocation, currentScene.camera.near);
-		// get the uniform
-		isDBUniformLocation = gl.getUniformLocation(billboardProgram.program, "u_far");
-		// Send data to float uniform
-		gl.uniform1f(isDBUniformLocation, currentScene.camera.far);
-	}else{
-		// get the uniform
-		isDBUniformLocation = gl.getUniformLocation(billboardProgram.program, "u_isDepthBuffer");
-		// Send phong exp uniform
-		gl.uniform1f(isDBUniformLocation, 0);
+function renderReflectionPass(){
+	if(!currentScene.mirror || !currentScene.mirror.framebuffer){
+		return;
 	}
+
+	// Render into the mirror framebuffer
+	gl.bindFramebuffer(
+		gl.FRAMEBUFFER,
+		currentScene.mirror.framebuffer
+	);
+
+	// The mirror texture is 512x512 or whatever size is created.
+	// So the viewport should match the texture, not the canvas.
+	var renderTargetWidth = currentScene.mirror.renderTargetWidth;
+	var renderTargetHeight = currentScene.mirror.renderTargetHeight;
+
+	gl.viewport(
+		0,
+		0,
+		renderTargetWidth,
+		renderTargetHeight
+	);
+
+	// Debug clear color suggested in assignment.
+	// Blue means: this came from the reflection pass.
+	gl.clearColor(0.0, 0.0, 1.0, 1.0);
+
+	gl.clear(
+		gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT
+	);
+
+	// Aposey Note: TEMPORARY:
+	// For now, use the real camera.
+	// Later this will be replaced with the reflected fake camera.
+	var reflectionCamera = currentScene.camera;
+
+	// Render the scene into the mirror texture.
+	// Important: do NOT render the mirror here,
+	// or the mirror will try to reflect itself.
+	renderObjWithCamera(reflectionCamera);
+	renderBillboardWithCamera(reflectionCamera);
+
+	// Return to the normal/default framebuffer.
+	// This means future rendering goes to the screen again.
+	gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+}
+
+function renderMainPass(){
+	// Render to the actual canvas
+	gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+	webglUtils.resizeCanvasToDisplaySize(gl.canvas);
+
+	gl.viewport(
+		0,
+		0,
+		gl.canvas.width,
+		gl.canvas.height
+	);
+
+	// Use the scene's normal background color.
+	gl.clearColor(
+		currentScene.camera.DefaulColor[0],
+		currentScene.camera.DefaulColor[1],
+		currentScene.camera.DefaulColor[2],
+		1.0
+	);
+
+	gl.clear(
+		gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT
+	);
+
+	// Render normal scene from the real camera.
+	renderObjWithCamera(currentScene.camera);
+	renderBillboardWithCamera(currentScene.camera);
+
+	// Render the mirror last-ish, using the texture created in renderReflectionPass().
+	renderMirror();
+}
+
+
+function renderBillboardWithCamera(camera){
+	gl.disable(gl.CULL_FACE);
+	gl.enable(gl.DEPTH_TEST);
+
+	// Tell it to use our program (pair of shaders)
+	gl.useProgram(billboardProgram.program);
+
+	// Turn on the Position attribute
+	gl.enableVertexAttribArray(billboardProgram.positionLocationAttrib);
 	
+	// Bind the position buffer.
+	gl.bindBuffer(gl.ARRAY_BUFFER, currentScene.billboard.positionBuffer);
+
+	// Tell the position attribute how to get data out of positionBuffer (ARRAY_BUFFER)
+	var size = 3;          // 3 components per iteration
+	var type = gl.FLOAT;   // the data is 32bit floats
+	var normalize = false; // don't normalize the data
+	var stride = 0;        // 0 = move forward size * sizeof(type) each iteration to get the next position
+	var offset = 0;        // start at the beginning of the buffer
+
+	gl.vertexAttribPointer(
+		billboardProgram.positionLocationAttrib, size, type, normalize, stride, offset);
+
+	// Turn on the Normal attribute
+	gl.enableVertexAttribArray(billboardProgram.normalLocationAttrib);
+	
+	//Bind the normal buffer
+	gl.bindBuffer(gl.ARRAY_BUFFER, currentScene.billboard.normalBuffer);
+
+	// Tell the normal attribute how to get data out of normalBuffer
+	var normalSize = 3;          // 3 components per iteration
+	var normalType = gl.FLOAT;   //the data is 32bit floats
+	var normalNormalize = false; //don't normalize the data
+	var normalStride = 0;		 //0 = move forward size * sizeof(type) each iteration
+	var normalOffset = 0;        //start at the begininng of the buffer
+
+	gl.vertexAttribPointer(
+		billboardProgram.normalLocationAttrib, normalSize, normalType, normalNormalize, normalStride, normalOffset);
+
+	// Turn on Texture attribute
+	gl.enableVertexAttribArray(billboardProgram.textureLocationAttrib);
+	
+	//bind the texture buffer
+	gl.bindBuffer(gl.ARRAY_BUFFER, currentScene.billboard.textureBuffer);
+
+	// Tell the texture coordinate attribute how to get data out of textureBuffer
+	var texcoordSize = 2;          // u, v
+	var texcoordType = gl.FLOAT;
+	var texcoordNormalize = false;
+	var texcoordStride = 0;
+	var texcoordOffset = 0;
+
+	gl.vertexAttribPointer(
+		billboardProgram.textureLocationAttrib, texcoordSize, texcoordType, texcoordNormalize, texcoordStride, texcoordOffset);
+
+	// Camera / projection setup
+	var aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
+
+	var projectionMatrix = m4.perspective(degToRad(camera.fov), aspect, camera.near, camera.far);
+
+	var cameraPosition = [
+		camera.position.x,
+		camera.position.y,
+		camera.position.z
+	];
+
+	var cameraTarget = [
+		camera.target.x,
+		camera.target.y,
+		camera.target.z
+	];
+
+	var cameraUp = [
+		camera.up.x,
+		camera.up.y,
+		camera.up.z
+	];
+
+	var cameraMatrix = m4.lookAt(
+		cameraPosition,
+		cameraTarget,
+		cameraUp
+	);
+
+	var viewMatrix = m4.inverse(cameraMatrix);
+	var viewProjectionMatrix = m4.multiply(projectionMatrix, viewMatrix);
+
+	gl.uniformMatrix4fv(
+		billboardProgram.worldViewProjectionUniformLocation,
+		false,
+		viewProjectionMatrix
+	);
+
+	// Light setup
+	var lightDirection = new Float32Array([
+		currentScene.light.locationPoint.x,
+		currentScene.light.locationPoint.y,
+		currentScene.light.locationPoint.z
+	]);
+
+	gl.uniform3fv(
+		billboardProgram.lightDirectionUniformLocation,
+		lightDirection
+	);
+
+	// Texture setup
+	gl.activeTexture(gl.TEXTURE0);
+	gl.bindTexture(gl.TEXTURE_2D, currentScene.billboard.billboardTextureBuffer);
+	gl.uniform1i(billboardProgram.textureUniformLocation, 0);
+
+	// Other uniforms
+	var phongExponent = document.getElementById("phongExponent").value;
+
+	gl.uniform1f(
+		billboardProgram.phongExponentLocationUniform,
+		phongExponent
+	);
+
+	var showDepthBuffer = document.getElementById("depthBuffer").checked;
+
+	if(showDepthBuffer){
+		gl.uniform1i(billboardProgram.isDepthBuffer, 1);
+	}else{
+		gl.uniform1i(billboardProgram.isDepthBuffer, 0);
+	}
+
+	// Draw the billboard: 2 triangles, 6 vertices total
+	gl.drawArrays(gl.TRIANGLES, 0, 6);
+}
+function renderMirror(){
+	gl.disable(gl.CULL_FACE);
+	gl.enable(gl.DEPTH_TEST);
+
+	gl.useProgram(billboardProgram.program);
+
+	// Position attribute
+	gl.enableVertexAttribArray(billboardProgram.positionLocationAttrib);
+
+	gl.bindBuffer(gl.ARRAY_BUFFER, currentScene.mirror.positionBuffer);
+
+	// Tell the position attribute how to get data out of positionBuffer (ARRAY_BUFFER)
+	var size = 3;          // 3 components per iteration:
+	var type = gl.FLOAT;   // the data is 32bit floats
+	var normalize = false; // don't normalize the data
+	var stride = 0;        // 0 = move forward size * sizeof(type) each iteration
+	var offset = 0;        // start at the beginning of the buffer
+
+	gl.vertexAttribPointer(
+		billboardProgram.positionLocationAttrib,
+		size,
+		type,
+		normalize,
+		stride,
+		offset
+	);
+
+	// turn on Normal attribute
+	gl.enableVertexAttribArray(billboardProgram.normalLocationAttrib);
+
+	gl.bindBuffer(gl.ARRAY_BUFFER, currentScene.mirror.normalBuffer);
+
+	var normalSize = 3;
+	var normalType = gl.FLOAT;
+	var normalNormalize = false;
+	var normalStride = 0;
+	var normalOffset = 0;
+
+	gl.vertexAttribPointer(
+		billboardProgram.normalLocationAttrib,
+		normalSize,
+		normalType,
+		normalNormalize,
+		normalStride,
+		normalOffset
+	);
+
+	// Turn on Texture coordinate attribute
+	gl.enableVertexAttribArray(billboardProgram.textureLocationAttrib);
+
+	gl.bindBuffer(gl.ARRAY_BUFFER, currentScene.mirror.textureBuffer);
+
+	var texcoordSize = 2;
+	var texcoordType = gl.FLOAT;
+	var texcoordNormalize = false;
+	var texcoordStride = 0;
+	var texcoordOffset = 0;
+
+	gl.vertexAttribPointer(
+		billboardProgram.textureLocationAttrib,
+		texcoordSize,
+		texcoordType,
+		texcoordNormalize,
+		texcoordStride,
+		texcoordOffset
+	);
+
+	// Use the real camera to draw the mirror surface
+	var camera = currentScene.camera;
+
+	var aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
+
+	var projectionMatrix = m4.perspective(
+		degToRad(camera.fov),
+		aspect,
+		camera.near,
+		camera.far
+	);
+
+	var cameraPosition = [
+		camera.position.x,
+		camera.position.y,
+		camera.position.z
+	];
+
+	var cameraTarget = [
+		camera.target.x,
+		camera.target.y,
+		camera.target.z
+	];
+
+	var cameraUp = [
+		camera.up.x,
+		camera.up.y,
+		camera.up.z
+	];
+
+	var cameraMatrix = m4.lookAt(
+		cameraPosition,
+		cameraTarget,
+		cameraUp
+	);
+
+	var viewMatrix = m4.inverse(cameraMatrix);
+	var viewProjectionMatrix = m4.multiply(projectionMatrix, viewMatrix);
+
+	gl.uniformMatrix4fv(
+		billboardProgram.worldViewProjectionUniformLocation,
+		false,
+		viewProjectionMatrix
+	);
+
+	// Light setup
+	var lightDirection = new Float32Array([
+		currentScene.light.locationPoint.x,
+		currentScene.light.locationPoint.y,
+		currentScene.light.locationPoint.z
+	]);
+
+	gl.uniform3fv(
+		billboardProgram.lightDirectionUniformLocation,
+		lightDirection
+	);
+
+	// Use the reflection texture instead of a PNG
+	gl.activeTexture(gl.TEXTURE0);
+	gl.bindTexture(gl.TEXTURE_2D, currentScene.mirror.renderTexture);
+	gl.uniform1i(billboardProgram.textureUniformLocation, 0);
+
+	var phongExponent = document.getElementById("phongExponent").value;
+
+	gl.uniform1f(
+		billboardProgram.phongExponentLocationUniform,
+		phongExponent
+	);
+
+	var showDepthBuffer = document.getElementById("depthBuffer").checked;
+
+	if(showDepthBuffer){
+		gl.uniform1i(billboardProgram.isDepthBuffer, 1);
+	}else{
+		gl.uniform1i(billboardProgram.isDepthBuffer, 0);
+	}
+
+	// Draw the mirror: 2 triangles, 6 vertices total
 	gl.drawArrays(gl.TRIANGLES, 0, 6);
 }
 
-function renderObj(){
+function renderObjWithCamera(camera){
 	gl.enable(gl.CULL_FACE);
-    gl.enable(gl.DEPTH_TEST);
+	gl.enable(gl.DEPTH_TEST);
 
-    // Tell it to use our program (pair of shaders)
-    gl.useProgram(objProgram.program);
-	
-	//Todo: Here you can activate and bind any attribute you need in shader.
-    // Turn on the position attribute
-    gl.enableVertexAttribArray(objProgram.positionLocationAttrib);
+	gl.useProgram(objProgram.program);
 
-    // Bind the position buffer.
-    gl.bindBuffer(gl.ARRAY_BUFFER, currentScene.obj.positionBuffer);
-	
+	// Turn on Position attribute
+	gl.enableVertexAttribArray(objProgram.positionLocationAttrib);
+
+	gl.bindBuffer(gl.ARRAY_BUFFER, currentScene.obj.positionBuffer);
+
 	// Tell the position attribute how to get data out of positionBuffer (ARRAY_BUFFER)
-    var size = 3;          // 3 components per iteration
-    var type = gl.FLOAT;   // the data is 32bit floats
-    var normalize = false; // don't normalize the data
-    var stride = 0;        // 0 = move forward size * sizeof(type) each iteration to get the next position
-    var offset = 0;        // start at the beginning of the buffer
-    gl.vertexAttribPointer(
-        objProgram.positionLocationAttrib, size, type, normalize, stride, offset);
-		
-	
-	// Turn on the normal attribute
-    gl.enableVertexAttribArray(objProgram.normalLocationAttrib);
+	var size = 3;          // 3 components per iteration: x, y, z
+	var type = gl.FLOAT;   // the data is 32-bit floats
+	var normalize = false; // don't normalize the data
+	var stride = 0;        // 0 = move forward size * sizeof(type) each iteration
+	var offset = 0;        // start at the beginning of the buffer
 
-    // Bind the normal buffer.
-    gl.bindBuffer(gl.ARRAY_BUFFER, currentScene.obj.normalBuffer);
-	
-	// Tell the normal attribute how to get data out of normalBuffer (ARRAY_BUFFER)
-    var size = 3;          // 3 components per iteration
-    var type = gl.FLOAT;   // the data is 32bit floats
-    var normalize = false; // don't normalize the data
-    var stride = 0;        // 0 = move forward size * sizeof(type) each iteration to get the next normal
-    var offset = 0;        // start at the beginning of the buffer
-    gl.vertexAttribPointer(
-        objProgram.normalLocationAttrib, size, type, normalize, stride, offset);
-	
+	gl.vertexAttribPointer(
+		objProgram.positionLocationAttrib,
+		size,
+		type,
+		normalize,
+		stride,
+		offset
+	);
 
-    // Compute the projection matrix
-    var aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
-    var projectionMatrix =
-        m4.perspective(degToRad(currentScene.camera.fov), aspect, currentScene.camera.near, currentScene.camera.far);
+	// Turn on the Normal attribute
+	gl.enableVertexAttribArray(objProgram.normalLocationAttrib);
 
-	var cameraMatrix;
-	// Compute the camera's matrix using look at.
-	cameraMatrix = m4.lookAt([currentScene.camera.position.x,currentScene.camera.position.y,currentScene.camera.position.z], [currentScene.camera.target.x,currentScene.camera.target.y,currentScene.camera.target.z], [currentScene.camera.up.x,currentScene.camera.up.y,currentScene.camera.up.z]);
+	gl.bindBuffer(gl.ARRAY_BUFFER, currentScene.obj.normalBuffer);
 
-    // Make a view matrix from the camera matrix.
-    var viewMatrix = m4.inverse(cameraMatrix);
-	
-	// To do: Model matrix should be used to translate the model. It needs to be sent to the shader code. The file "m4.js" provides some math functions for you.
-	// Translation is not implemented in the given file. You need to implement it yourself.
-	modelMatrix = m4.identity();
+	// Tell the normal attribute how to get data out of normalBuffer
+	var normalSize = 3;          // nx, ny, nz
+	var normalType = gl.FLOAT;
+	var normalNormalize = false;
+	var normalStride = 0;
+	var normalOffset = 0;
 
-    var viewProjectionMatrix = m4.multiply(projectionMatrix, viewMatrix);
-	
-	//Todo: You may need to input light direction as uniform to the shader program. Also here you can input any other uniform variable to shader.
-    // Set the viewProjectionMatrix.
-	gl.uniformMatrix4fv(objProgram.worldViewProjectionUniformLocation, false, viewProjectionMatrix);
-	
-	// Set the fixed color
-	gl.uniform3fv(objProgram.colorUniformLocation, new Float32Array([1.0,0.1,0.1]));
-	
-	// Send the light direction to the uniform.
-	gl.uniform3fv(objProgram.lightDirectionUniformLocation, new Float32Array([currentScene.light.locationPoint.x,currentScene.light.locationPoint.y,currentScene.light.locationPoint.z]));
-	
-	if(isShowDepth.checked == true){// Get checkbox value
-		// get the uniform
-		isDBUniformLocation = gl.getUniformLocation(objProgram.program, "u_isDepthBuffer");
-		// Send data to float uniform
-		gl.uniform1f(isDBUniformLocation, 1);
-		
-		// We send near and far of the camera to the shader to normalize the depth buffer
-		// get the uniform
-		isDBUniformLocation = gl.getUniformLocation(objProgram.program, "u_near");
-		// Send data to float uniform
-		gl.uniform1f(isDBUniformLocation, currentScene.camera.near);
-		// get the uniform
-		isDBUniformLocation = gl.getUniformLocation(objProgram.program, "u_far");
-		// Send data to float uniform
-		gl.uniform1f(isDBUniformLocation, currentScene.camera.far);
-	}else{
-		// get the uniform
-		isDBUniformLocation = gl.getUniformLocation(objProgram.program, "u_isDepthBuffer");
-		// Send phong exp uniform
-		gl.uniform1f(isDBUniformLocation, 0);
+	gl.vertexAttribPointer(
+		objProgram.normalLocationAttrib,
+		normalSize,
+		normalType,
+		normalNormalize,
+		normalStride,
+		normalOffset
+	);
+
+	// Camera / projection setup
+	var aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
+
+	var projectionMatrix = m4.perspective(
+		degToRad(camera.fov),
+		aspect,
+		camera.near,
+		camera.far
+	);
+
+	var cameraPosition = [
+		camera.position.x,
+		camera.position.y,
+		camera.position.z
+	];
+
+	var cameraTarget = [
+		camera.target.x,
+		camera.target.y,
+		camera.target.z
+	];
+
+	var cameraUp = [
+		camera.up.x,
+		camera.up.y,
+		camera.up.z
+	];
+
+	var cameraMatrix = m4.lookAt(
+		cameraPosition,
+		cameraTarget,
+		cameraUp
+	);
+
+	var viewMatrix = m4.inverse(cameraMatrix);
+
+	// Aposey: Note: For now, the object is not translated/rotated/scaled.
+	// Aposey: Note: Later, this is where object positioning can be applied.
+	var modelMatrix = m4.identity();
+
+	var viewProjectionMatrix = m4.multiply(projectionMatrix, viewMatrix);
+	var worldViewProjectionMatrix = m4.multiply(viewProjectionMatrix, modelMatrix);
+
+	gl.uniformMatrix4fv(
+		objProgram.worldViewProjectionUniformLocation,
+		false,
+		worldViewProjectionMatrix
+	);
+
+	// Color setup
+	var objectColor = new Float32Array([1.0, 0.1, 0.1]);
+
+	gl.uniform3fv(
+		objProgram.colorUniformLocation,
+		objectColor
+	);
+
+	// Light setup
+	var lightDirection = new Float32Array([
+		currentScene.light.locationPoint.x,
+		currentScene.light.locationPoint.y,
+		currentScene.light.locationPoint.z
+	]);
+
+	gl.uniform3fv(
+		objProgram.lightDirectionUniformLocation,
+		lightDirection
+	);
+
+	// Other uniforms
+	var phongExponent = document.getElementById("phongExponent").value;
+
+	gl.uniform1f(
+		objProgram.phongExponentLocationUniform,
+		phongExponent
+	);
+
+	var showDepthBuffer = document.getElementById("depthBuffer").checked;
+
+	if(showDepthBuffer){
+		gl.uniform1i(objProgram.isDepthBuffer, 1);
 	}
-	
+	else{
+		gl.uniform1i(objProgram.isDepthBuffer, 0);
+	}
+
 	gl.drawArrays(gl.TRIANGLES, 0, currentScene.obj.numVertices);
 }
 
@@ -395,6 +703,11 @@ function programAll(){
 function preprocessBuffers(){
 	makeObjBuffers();
 	makeBillboardBuffers();
+	makeMirrorBuffers();
+	//Check making the buffers works
+	console.log("mirror object:", currentScene.mirror);
+	console.log("mirror framebuffer:", currentScene.mirror.framebuffer);
+	console.log("mirror render texture:", currentScene.mirror.renderTexture);
 }
 
 function makeBillboardBuffers(){
@@ -428,6 +741,82 @@ function makeBillboardBuffers(){
     gl.generateMipmap(gl.TEXTURE_2D);
   
     sceneBillboard.setBuffers(billboardPositionBuffer,billboardTextcoordBuffer,billboardNormalBuffer,billboardTextureBuffer);
+}
+
+function makeMirrorBuffers(){
+	let sceneMirror = currentScene.mirror;
+
+	//Skip if no mirror exists in scene
+	if(!sceneMirror){
+		return; // no mirror in this scene
+	}
+
+	// Create a buffer for positions
+	let mirrorPositionBuffer = gl.createBuffer();
+	// Bind it to ARRAY_BUFFER (think of it as ARRAY_BUFFER = positionBuffer)
+	gl.bindBuffer(gl.ARRAY_BUFFER, mirrorPositionBuffer);
+	 // Set Texcoords.
+	setBillboardGeometry(gl, sceneMirror);
+
+	 // provide texture coordinates for the rectangle.
+	let mirrorTextcoordBuffer = gl.createBuffer();
+	gl.bindBuffer(gl.ARRAY_BUFFER, mirrorTextcoordBuffer);
+	setBillboardTexcoords(gl, sceneMirror);
+
+    // Create a buffer to put normals in
+	let mirrorNormalBuffer = gl.createBuffer();
+	// Bind it to ARRAY_BUFFER (think of it as ARRAY_BUFFER = normalBuffer)
+	gl.bindBuffer(gl.ARRAY_BUFFER, mirrorNormalBuffer);
+	// Put normals data into buffer
+	setBillboardNormals(gl, sceneMirror);
+
+
+	// Pick a fixed texture size for now.
+	// 512x512 is a good starting point.
+	let targetTextureWidth = 512;
+	let targetTextureHeight = 512;
+
+	//Create a texture
+	let mirrorRenderTexture = gl.createTexture();
+	gl.bindTexture(gl.TEXTURE_2D, mirrorRenderTexture);
+	gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,targetTextureWidth,targetTextureHeight,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
+
+	// For render-to-texture, clamp + linear is a safe starter setup
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+	//Depth buffer for offscreen rendering
+	let mirrorDepthBuffer = gl.createRenderbuffer();
+	gl.bindRenderbuffer(gl.RENDERBUFFER, mirrorDepthBuffer);
+	gl.renderbufferStorage(gl.RENDERBUFFER,gl.DEPTH_COMPONENT16,targetTextureWidth,targetTextureHeight);
+
+	//Freame Buffer
+	let mirrorFramebuffer = gl.createFramebuffer();
+	gl.bindFramebuffer(gl.FRAMEBUFFER, mirrorFramebuffer);
+
+	// Attach color texture
+	gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,mirrorRenderTexture,0);
+
+	// Attach depth renderbuffer
+	gl.framebufferRenderbuffer(gl.FRAMEBUFFER,gl.DEPTH_ATTACHMENT,gl.RENDERBUFFER,mirrorDepthBuffer);
+
+	// Optional but very useful check (Googlesays this is a good idea)
+	let fbStatus = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+	if (fbStatus !== gl.FRAMEBUFFER_COMPLETE) {
+		console.error("Mirror framebuffer is incomplete. Status:", fbStatus);
+	}
+
+	// Clean up bindings so later code starts from a normal state
+	gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+	gl.bindTexture(gl.TEXTURE_2D, null);
+	gl.bindRenderbuffer(gl.RENDERBUFFER, null);
+
+	//Store everything on mirror
+	sceneMirror.setBuffers(mirrorPositionBuffer,mirrorTextcoordBuffer,mirrorNormalBuffer,mirrorRenderTexture);
+
+	sceneMirror.setRenderTarget(mirrorFramebuffer,mirrorRenderTexture,mirrorDepthBuffer,targetTextureWidth,targetTextureHeight);
 }
 
 function makeObjBuffers(){
@@ -905,6 +1294,14 @@ class Billboard{
 		this.normalBuffer=normalBuffer;
 		this.billboardTextureBuffer=billboardTextureBuffer;
 	}
+
+	setRenderTarget(framebuffer, renderTexture, depthBuffer, width, height){
+		this.framebuffer = framebuffer;
+		this.renderTexture = renderTexture;
+		this.depthBuffer = depthBuffer;
+		this.renderTargetWidth = width;
+		this.renderTargetHeight = height;
+	}
 }
 
 class Object3D{
@@ -950,9 +1347,10 @@ class Camera{
 }
 
 class Scene{//This object technically stores everything required for a scene
-	constructor(light,billboard,obj,camera){
+	constructor(light,billboard,mirror, obj,camera){
 		this.light=light;
 		this.billboard=billboard;
+		this.mirror = mirror;
 		this.camera=camera;
 		this.obj=obj;
 	}
@@ -980,11 +1378,35 @@ function parseScene(file_data)//A simple function to read JSON and put the data 
 		
 		billboard=new Billboard(upperLeft,lowerLeft,upperRight,lowerRight,sceneFile.billboard.filename,null,null);//Image is assigned to billboard later
 	}
+
+		var mirror = null;
+	if ('mirror' in sceneFile) { // If mirror exists in scene
+		let upperLeft = new Vector3(sceneFile.mirror.UpperLeft[0],sceneFile.mirror.UpperLeft[1],sceneFile.mirror.UpperLeft[2]);
+		let lowerLeft = new Vector3(sceneFile.mirror.LowerLeft[0],sceneFile.mirror.LowerLeft[1],sceneFile.mirror.LowerLeft[2]);
+		let upperRight = new Vector3(sceneFile.mirror.UpperRight[0],sceneFile.mirror.UpperRight[1],sceneFile.mirror.UpperRight[2]);
+
+		// Compute lower-right from the other 3 corners
+		let mirrorHeight = upperLeft.y - lowerLeft.y;
+		let lowerRight = new Vector3(upperRight.x,upperRight.y - mirrorHeight,upperRight.z);
+
+		// Mirror uses Billboard class too.
+		// No image file is needed yet because later this will use a render-to-texture result.
+		mirror = new Billboard(
+			upperLeft,
+			lowerLeft,
+			upperRight,
+			lowerRight,
+			null,
+			null,
+			null
+		);
+	}
+
 	var obj=null;
 	if ('obj' in sceneFile) {//If billboard exists in scene
 		let position=sceneFile.obj.position;
 		let fileName=sceneFile.obj.filename;
 		obj=new Object3D(position,fileName);
 	}
-	return new Scene(light,billboard,obj,camera);
+	return new Scene(light,billboard,mirror, obj,camera);
 }
