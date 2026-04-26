@@ -676,10 +676,10 @@ function renderMirror(){
 	gl.drawArrays(gl.TRIANGLES, 0, 6);
 }
 
-function renderObjWithCamera(camera,now){
+function renderObjWithCamera(camera){
 	gl.enable(gl.CULL_FACE);
 	gl.enable(gl.DEPTH_TEST);
-	
+	/*
 	// Convert to seconds
     now *= 0.001;
     // Subtract the previous time from the current time
@@ -689,7 +689,7 @@ function renderObjWithCamera(camera,now){
 	
 	// Model rotation angle
 	modelRotationRadians += 2.1 * deltaTime;
-
+	*/
 	gl.useProgram(objProgram.program);
 
 	// Turn on Position attribute
@@ -773,9 +773,9 @@ function renderObjWithCamera(camera,now){
 	// Aposey: Note: For now, the object is not translated/rotated/scaled.
 	// Aposey: Note: Later, this is where object positioning can be applied.
 	var modelMatrix = m4.identity();
-	m4.scale(modelMatrix,1,1,1,modelMatrix);
+	//m4.scale(modelMatrix,1,1,1,modelMatrix);
 	m4.translate(modelMatrix,currentScene.obj.position[0],currentScene.obj.position[1],currentScene.obj.position[2],modelMatrix);
-	m4.yRotate(modelMatrix,modelRotationRadians,modelMatrix);
+	//m4.yRotate(modelMatrix,modelRotationRadians,modelMatrix);
 
 
 	var viewProjectionMatrix = m4.multiply(projectionMatrix, viewMatrix);
