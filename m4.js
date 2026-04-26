@@ -189,6 +189,44 @@
     dst[2] = v[2] * s;
     return dst;
   }
+	
+  /**
+   * Multiply by a scaling matrix
+   * @param {Matrix4} m matrix to multiply
+   * @param {number} sx x scale.
+   * @param {number} sy y scale.
+   * @param {number} sz z scale.
+   * @param {Matrix4} [dst] optional matrix to store result
+   * @return {Matrix4} dst or a new matrix if none provided
+   * @memberOf module:webgl-3d-math
+   */
+  function scale(m, sx, sy, sz, dst) {
+    // This is the optimized version of
+    // return multiply(m, scaling(sx, sy, sz), dst);
+    dst = dst || new MatType(16);
+
+    dst[ 0] = sx * m[0 * 4 + 0];
+    dst[ 1] = sx * m[0 * 4 + 1];
+    dst[ 2] = sx * m[0 * 4 + 2];
+    dst[ 3] = sx * m[0 * 4 + 3];
+    dst[ 4] = sy * m[1 * 4 + 0];
+    dst[ 5] = sy * m[1 * 4 + 1];
+    dst[ 6] = sy * m[1 * 4 + 2];
+    dst[ 7] = sy * m[1 * 4 + 3];
+    dst[ 8] = sz * m[2 * 4 + 0];
+    dst[ 9] = sz * m[2 * 4 + 1];
+    dst[10] = sz * m[2 * 4 + 2];
+    dst[11] = sz * m[2 * 4 + 3];
+
+    if (m !== dst) {
+      dst[12] = m[12];
+      dst[13] = m[13];
+      dst[14] = m[14];
+      dst[15] = m[15];
+    }
+
+    return dst;
+  }
 
   /**
    * normalizes a vector.
@@ -855,6 +893,109 @@
 
     return dst;
   }
+  
+  /**
+   * Multiply by translation matrix.
+   * @param {Matrix4} m matrix to multiply
+   * @param {number} tx x translation.
+   * @param {number} ty y translation.
+   * @param {number} tz z translation.
+   * @param {Matrix4} [dst] optional matrix to store result
+   * @return {Matrix4} dst or a new matrix if none provided
+   * @memberOf module:webgl-3d-math
+   */
+  function translate(m, tx, ty, tz, dst) {
+    // This is the optimized version of
+    // return multiply(m, translation(tx, ty, tz), dst);
+    dst = dst || new MatType(16);
+
+    var m00 = m[0];
+    var m01 = m[1];
+    var m02 = m[2];
+    var m03 = m[3];
+    var m10 = m[1 * 4 + 0];
+    var m11 = m[1 * 4 + 1];
+    var m12 = m[1 * 4 + 2];
+    var m13 = m[1 * 4 + 3];
+    var m20 = m[2 * 4 + 0];
+    var m21 = m[2 * 4 + 1];
+    var m22 = m[2 * 4 + 2];
+    var m23 = m[2 * 4 + 3];
+    var m30 = m[3 * 4 + 0];
+    var m31 = m[3 * 4 + 1];
+    var m32 = m[3 * 4 + 2];
+    var m33 = m[3 * 4 + 3];
+
+    if (m !== dst) {
+      dst[ 0] = m00;
+      dst[ 1] = m01;
+      dst[ 2] = m02;
+      dst[ 3] = m03;
+      dst[ 4] = m10;
+      dst[ 5] = m11;
+      dst[ 6] = m12;
+      dst[ 7] = m13;
+      dst[ 8] = m20;
+      dst[ 9] = m21;
+      dst[10] = m22;
+      dst[11] = m23;
+    }
+
+    dst[12] = m00 * tx + m10 * ty + m20 * tz + m30;
+    dst[13] = m01 * tx + m11 * ty + m21 * tz + m31;
+    dst[14] = m02 * tx + m12 * ty + m22 * tz + m32;
+    dst[15] = m03 * tx + m13 * ty + m23 * tz + m33;
+
+    return dst;
+  }
+
+/**
+   * Multiply by an y rotation matrix
+   * @param {Matrix4} m matrix to multiply
+   * @param {number} angleInRadians amount to rotate
+   * @param {Matrix4} [dst] optional matrix to store result
+   * @return {Matrix4} dst or a new matrix if none provided
+   * @memberOf module:webgl-3d-math
+   */
+  function yRotate(m, angleInRadians, dst) {
+    // this is the optimized version of
+    // return multiply(m, yRotation(angleInRadians), dst);
+    dst = dst || new MatType(16);
+
+    var m00 = m[0 * 4 + 0];
+    var m01 = m[0 * 4 + 1];
+    var m02 = m[0 * 4 + 2];
+    var m03 = m[0 * 4 + 3];
+    var m20 = m[2 * 4 + 0];
+    var m21 = m[2 * 4 + 1];
+    var m22 = m[2 * 4 + 2];
+    var m23 = m[2 * 4 + 3];
+    var c = Math.cos(angleInRadians);
+    var s = Math.sin(angleInRadians);
+
+    dst[ 0] = c * m00 - s * m20;
+    dst[ 1] = c * m01 - s * m21;
+    dst[ 2] = c * m02 - s * m22;
+    dst[ 3] = c * m03 - s * m23;
+    dst[ 8] = c * m20 + s * m00;
+    dst[ 9] = c * m21 + s * m01;
+    dst[10] = c * m22 + s * m02;
+    dst[11] = c * m23 + s * m03;
+
+    if (m !== dst) {
+      dst[ 4] = m[ 4];
+      dst[ 5] = m[ 5];
+      dst[ 6] = m[ 6];
+      dst[ 7] = m[ 7];
+      dst[12] = m[12];
+      dst[13] = m[13];
+      dst[14] = m[14];
+      dst[15] = m[15];
+    }
+
+    return dst;
+  }
+
 
   /**
    * Takes a 4-by-4 matrix m and a vector v with 3 entries, interprets the vector
@@ -935,6 +1076,9 @@
     transformDirection: transformDirection,
     transformNormal: transformNormal,
     setDefaultType: setDefaultType,
+	scale: scale,
+	translate: translate,
+	yRotate: yRotate
   };
 
 }));

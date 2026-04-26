@@ -49,6 +49,9 @@ var objZ = document.getElementById('objZID');//Slider for obj position
 var pexp = document.getElementById('pexpID');//Slider for phong
 var isShowDepth = document.getElementById('isDepthBuffer');//checkbox for depth
 
+var modelRotationRadians = degToRad(0);
+var previousFrameTime = 0;
+
 camX.addEventListener("input", function(evt) {
 	if(doneLoading && currentScene){
 		currentScene.camera.position.x=Number(camX.value);
@@ -77,8 +80,10 @@ camZ.addEventListener("input", function(evt) {
 },false);
 
 objX.addEventListener("input", function(evt) {
-	if(doneLoading && currentScene && currentScene.obj){
-		currentScene.obj.position[0] = Number(camX.value);
+	if(doneLoading && currentScene){
+		console.log("objX[0]: " + currentScene.obj.position[0]);
+		currentScene.obj.position[0] = Number(objX.value);
+		console.log("objX[0]: " + currentScene.obj.position[0]);
 		var objXLabel = document.getElementById("objXLabelID");
 		objXLabel.innerHTML = objX.value;
 		objX.label = "Obj X: "+objX.value;//refresh objX text
@@ -86,7 +91,7 @@ objX.addEventListener("input", function(evt) {
 },false);
 
 objY.addEventListener("input", function(evt) {
-	if(doneLoading && currentScene && currentScene.obj){
+	if(doneLoading && currentScene){
 		currentScene.obj.position[1] = Number(objY.value);
 		var objYLabel = document.getElementById("objYLabelID");
 		objYLabel.innerHTML = objY.value;
@@ -95,7 +100,7 @@ objY.addEventListener("input", function(evt) {
 },false);
 
 objZ.addEventListener("input", function(evt) {
-	if(doneLoading && currentScene && currentScene.obj){
+	if(doneLoading && currentScene){
 		currentScene.obj.position[2] = Number(objZ.value);
 		var objZLabel = document.getElementById("objZLabelID");
 		objZLabel.innerHTML = objZ.value;
@@ -266,6 +271,7 @@ function drawScene() {
 
 //Acposey Note: Break up rendering function into two passes one to get reflection with seperate camera then second is real pass with grabbed texture
 function renderingFcn(){
+	//renderMainPass();
 	renderReflectionPass();
 	renderMainPass();
 }
@@ -670,9 +676,19 @@ function renderMirror(){
 	gl.drawArrays(gl.TRIANGLES, 0, 6);
 }
 
-function renderObjWithCamera(camera){
+function renderObjWithCamera(camera,now){
 	gl.enable(gl.CULL_FACE);
 	gl.enable(gl.DEPTH_TEST);
+	
+	// Convert to seconds
+    now *= 0.001;
+    // Subtract the previous time from the current time
+    var deltaTime = now - previousFrameTime;
+    // Remember the current time for the next frame.
+    previousFrameTime = now;
+	
+	// Model rotation angle
+	modelRotationRadians += 2.1 * deltaTime;
 
 	gl.useProgram(objProgram.program);
 
@@ -757,6 +773,10 @@ function renderObjWithCamera(camera){
 	// Aposey: Note: For now, the object is not translated/rotated/scaled.
 	// Aposey: Note: Later, this is where object positioning can be applied.
 	var modelMatrix = m4.identity();
+	m4.scale(modelMatrix,1,1,1,modelMatrix);
+	m4.translate(modelMatrix,currentScene.obj.position[0],currentScene.obj.position[1],currentScene.obj.position[2],modelMatrix);
+	m4.yRotate(modelMatrix,modelRotationRadians,modelMatrix);
+
 
 	var viewProjectionMatrix = m4.multiply(projectionMatrix, viewMatrix);
 	var worldViewProjectionMatrix = m4.multiply(viewProjectionMatrix, modelMatrix);
