@@ -1,7 +1,8 @@
 Template code for A05
 ------------
 
-Author: Your name [youremail@email.arizona.edu]
+Author: Aaron Posey [acposey@arizona.edu]
+		Cesar D. Quihuis-Romero [qromeroc@arizona.edu]
 Date: April 17, 2026
 
 **PLEASE UPDATE THIS README**
